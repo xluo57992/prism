@@ -47,7 +47,7 @@ void AboutOverlay::paint (juce::Graphics& g)
 
     g.setColour (juce::Colour (0xFF8A8B96));
     g.setFont (juce::Font (juce::FontOptions ("Microsoft YaHei UI", 14.0f, juce::Font::plain)));
-    g.drawText (juce::String::fromUTF8 ("PRISM  ·  ALL-PASS DISPERSION  ·  v1.1"),
+    g.drawText (juce::String::fromUTF8 ("PRISM  ·  ALL-PASS DISPERSION  ·  v1.1.1"),
                 juce::Rectangle<float> (128.0f, 18.0f, 300.0f, 22.0f),
                 juce::Justification::centredLeft);
 
@@ -72,7 +72,7 @@ void AboutOverlay::paint (juce::Graphics& g)
                           "右上角「总开关」旁通：射线会收回棱镜\n"
                           "右上角「频率视图」：另开窗口看群延迟分布\n"
                           "\n"
-                          "Yunshu_TSK　·　v1.1　·　2026　·　GPLv3 开源\n"
+                          "Yunshu_TSK　·　v1.1.1　·　2026　·　GPLv3 开源\n"
                           "space.bilibili.com/1394063758\n"
                           "100% DeepSeek 4.1 Flash 制作\n"
                           "DSP 参考 AllPassPhase by enummusic（按算法重写，未使用其代码）\n"

@@ -528,7 +528,9 @@ int main()
             double phase = 0.0;
 
             FrequencyViewComponent view (fx);
+            std::printf ("[freqview] constructed\n");
             view.setSize (920, 560);
+            std::printf ("[freqview] sized\n");
 
             for (int block = 0; block < 90; ++block)
             {

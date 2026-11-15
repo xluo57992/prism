@@ -283,6 +283,25 @@ FrequencyViewComponent::FrequencyViewComponent (PrismProcessor& processorToUse)
     spectrum.setAlpha (0.38f);
     addAndMakeVisible (spectrum);
 
+    // 置顶开关：默认开。关掉之后点回宿主，这个窗口就会排到 FX 窗口后面
+    pinButton.setButtonText (juce::String::fromUTF8 ("置顶"));
+    pinButton.setComponentID ("prismFreqViewPin");
+    pinButton.setClickingTogglesState (true);
+    pinButton.setToggleState (true, juce::dontSendNotification);
+    pinButton.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xFF1C2028));
+    pinButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0x33D8A657));
+    pinButton.setColour (juce::TextButton::textColourOffId,  juce::Colour (0xFF8A8B96));
+    pinButton.setColour (juce::TextButton::textColourOnId,   juce::Colour (0xFFE8C07A));
+    pinButton.setTooltip (juce::String::fromUTF8 ("置顶：窗口始终盖在宿主 FX 窗口上面"));
+    pinButton.onClick = [this]
+    {
+        if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
+            window->setAlwaysOnTop (pinButton.getToggleState());
+
+        repaint();
+    };
+    addAndMakeVisible (pinButton);
+
     curveLayer = std::make_unique<CurveLayer> (*this);
     addAndMakeVisible (*curveLayer);
 
@@ -425,6 +444,8 @@ void FrequencyViewComponent::resized()
 
     spectrum.setBounds (plot.toNearestInt());
     curveLayer->setBounds (plot.toNearestInt());
+
+    pinButton.setBounds (getWidth() - 24 - 56, 15, 56, 24);
 }
 
 //==============================================================================
@@ -449,10 +470,15 @@ void FrequencyViewComponent::paint (juce::Graphics& g)
 
     g.setColour (textColour);
     g.setFont (prismFont (13.5f));
-    g.drawText (headerInfo(),
-                juce::Rectangle<int> (bounds.getWidth() > 420.0f ? (int) bounds.getWidth() - 404 : 22, 16,
-                                      juce::jmin (380, (int) bounds.getWidth() - 44), 22),
-                juce::Justification::centredRight);
+    {
+        // 右侧留给「置顶」按钮
+        const int infoRight = (int) bounds.getWidth() - 24 - 56 - 10;
+        const int infoWidth = juce::jlimit (120, 340, infoRight - 200);
+
+        g.drawText (headerInfo(),
+                    juce::Rectangle<int> (infoRight - infoWidth, 16, infoWidth, 22),
+                    juce::Justification::centredRight);
+    }
 
     g.setColour (dimTextColour);
     g.setFont (prismFont (12.5f));
@@ -528,6 +554,9 @@ FrequencyViewWindow::FrequencyViewWindow (PrismProcessor& processorToUse)
     setUsingNativeTitleBar (true);
     setResizable (true, false);
     setResizeLimits (560, 380, 2000, 1400);
+
+    // 默认置顶：否则点回宿主 FX 窗口，这个窗口会被盖到后面去（看起来像被关掉了）
+    setAlwaysOnTop (true);
 
     viewComponent = new FrequencyViewComponent (processorToUse);
     setContentOwned (viewComponent, true);
