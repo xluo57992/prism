@@ -79,6 +79,10 @@ class FrequencyViewWindow final : public juce::DocumentWindow
 public:
     explicit FrequencyViewWindow (PrismProcessor& processorToUse);
 
+    // 把这个窗口挂成宿主插件窗口的附属窗口（Windows：owner 关系）。
+    // 效果：跟着插件窗口一起显示/隐藏，盖在插件窗口上面，但不会盖住宿主的对话框。
+    void setHostWindow (juce::Component& hostComponent);
+
     void closeButtonPressed() override { setVisible (false); }
 
     FrequencyViewComponent& view() noexcept { return *viewComponent; }

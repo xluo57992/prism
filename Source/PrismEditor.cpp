@@ -202,6 +202,10 @@ void PrismEditor::toggleFrequencyView()
     if (frequencyWindow == nullptr)
     {
         frequencyWindow = std::make_unique<FrequencyViewWindow> (processor);
+
+        // 挂到宿主插件窗口上：跟着它显示/隐藏，但不会盖住宿主的对话框
+        frequencyWindow->setHostWindow (*this);
+
         frequencyWindow->toFront (true);
 
         PrismLog ("--- frequency view opened ---");
@@ -345,6 +349,14 @@ void PrismEditor::resized()
         drawerKnobs[(size_t) i]->slider.setBounds (x, drawerKnobTop + 20, drawerKnobSize, drawerKnobSize);
         drawerKnobs[(size_t) i]->valueLabel.setBounds (x - 40, drawerKnobTop + 80, drawerKnobSize + 80, 22);
     }
+}
+
+//==============================================================================
+void PrismEditor::visibilityChanged()
+{
+    // 宿主把插件窗口藏起来 / 切到别的插件时，别让频率视图还孤零零挂在桌面上
+    if (frequencyWindow != nullptr && ! isVisible())
+        frequencyWindow->setVisible (false);
 }
 
 //==============================================================================

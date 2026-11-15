@@ -5,6 +5,13 @@
 #include <cmath>
 #include <algorithm>
 
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>
+#endif
+
 namespace
 {
     const juce::Colour accentColour  (0xFFD8A657);
@@ -283,11 +290,11 @@ FrequencyViewComponent::FrequencyViewComponent (PrismProcessor& processorToUse)
     spectrum.setAlpha (0.38f);
     addAndMakeVisible (spectrum);
 
-    // 置顶开关：默认开。关掉之后点回宿主，这个窗口就会排到 FX 窗口后面
+    // 置顶开关：默认关。关掉时窗口跟着插件窗口走（owner 关系），不会盖住宿主的对话框
     pinButton.setButtonText (juce::String::fromUTF8 ("置顶"));
     pinButton.setComponentID ("prismFreqViewPin");
     pinButton.setClickingTogglesState (true);
-    pinButton.setToggleState (true, juce::dontSendNotification);
+    pinButton.setToggleState (false, juce::dontSendNotification);
     pinButton.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xFF1C2028));
     pinButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0x33D8A657));
     pinButton.setColour (juce::TextButton::textColourOffId,  juce::Colour (0xFF8A8B96));
@@ -555,12 +562,40 @@ FrequencyViewWindow::FrequencyViewWindow (PrismProcessor& processorToUse)
     setResizable (true, false);
     setResizeLimits (560, 380, 2000, 1400);
 
-    // 默认置顶：否则点回宿主 FX 窗口，这个窗口会被盖到后面去（看起来像被关掉了）
-    setAlwaysOnTop (true);
+    // 不用全局置顶：那会盖住 FL / REAPER 自己的确认对话框，点到都点不着。
+    // 改成"宿主插件窗口的附属窗口"（见 setHostWindow），行为跟插件窗口一致。
 
     viewComponent = new FrequencyViewComponent (processorToUse);
     setContentOwned (viewComponent, true);
 
     centreWithSize (920, 560);
     setVisible (true);
+}
+
+//==============================================================================
+void FrequencyViewWindow::setHostWindow (juce::Component& hostComponent)
+{
+   #if JUCE_WINDOWS
+    auto* myPeer = getPeer();
+    auto* hostPeer = hostComponent.getPeer();
+
+    if (myPeer == nullptr || hostPeer == nullptr)
+        return;
+
+    auto myHwnd   = (HWND) myPeer->getNativeHandle();
+    auto hostHwnd = (HWND) hostPeer->getNativeHandle();
+
+    if (myHwnd == nullptr || hostHwnd == nullptr)
+        return;
+
+    // 插件编辑器在宿主里往往是个子窗口，owner 必须是顶层窗口
+    HWND owner = GetAncestor (hostHwnd, GA_ROOT);
+
+    if (owner == nullptr || owner == myHwnd)
+        owner = hostHwnd;
+
+    SetWindowLongPtr (myHwnd, GWLP_HWNDPARENT, (LONG_PTR) owner);
+   #else
+    juce::ignoreUnused (hostComponent);
+   #endif
 }

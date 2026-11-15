@@ -23,6 +23,7 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void visibilityChanged() override;
 
     // 设计坐标系的画布：背景在这上面画，所有子控件也都挂在它下面
     void paintCanvas (juce::Graphics&);
