@@ -135,6 +135,10 @@ build\PrismEditorProbe.exe
 - 总开关是硬切，没有交叉淡入
 - 频率视图的「受影响频段」用峰值 25% 作阈值，是个显示约定，不是声学标准
 
+## 更新记录
+
+每个版本的改动、修复原因见 [CHANGELOG.md](CHANGELOG.md)；仓库保留完整提交历史，每个版本都有 tag 和对应的 Release。
+
 ## 许可证
 
 **GPLv3**。用 JUCE 8 的免费版本就意味着整个插件必须是 GPLv3——
