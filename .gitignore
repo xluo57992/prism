@@ -1,0 +1,18 @@
+# 构建产物
+build/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln
+*.vcxproj*
+
+# JUCE（如果放在仓库里）
+JUCE/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+*.swp
