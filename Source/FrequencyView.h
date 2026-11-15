@@ -50,8 +50,12 @@ private:
     SpectrumDisplay spectrum;
     std::unique_ptr<CurveLayer> curveLayer;
 
-    // 置顶开关：不置顶时点回宿主，窗口会被 FX 窗口盖住
+    // 置顶开关：不置顶时点回宿主窗口会被 FX 窗口盖住
     juce::TextButton pinButton;
+
+    // 延迟轴：关 = 跟着当前峰值自动缩放；开 = 锁在按下那一刻的上限
+    juce::TextButton axisLockButton;
+    void toggleAxisLock();
 
     dispersion::Curve curve;
     double sampleRate = 48000.0;

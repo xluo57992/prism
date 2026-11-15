@@ -81,10 +81,41 @@ namespace
 }
 
 //==============================================================================
+//==============================================================================
+// 崩溃定位：打印异常码 + 相对于 exe 基址的偏移，配合 .map 文件就能查到函数
+#if JUCE_WINDOWS
+ #include <windows.h>
+
+static LONG WINAPI reportCrash (EXCEPTION_POINTERS* info)
+{
+    auto* base = (char*) GetModuleHandle (nullptr);
+    auto* addr = (char*) info->ExceptionRecord->ExceptionAddress;
+
+    std::printf ("\n!! unhandled exception code=0x%08lX offset=0x%llX (base=%p)\n",
+                 (unsigned long) info->ExceptionRecord->ExceptionCode,
+                 (unsigned long long) (addr - base), base);
+    std::fflush (stdout);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+#endif
+
+//==============================================================================
 int main()
 {
     setvbuf (stdout, nullptr, _IONBF, 0);   // 崩溃时也能看到进度
 
+   #if JUCE_WINDOWS
+    SetUnhandledExceptionFilter (reportCrash);
+   #endif
+
+    std::set_terminate ([] {
+        std::printf ("\n!! std::terminate (uncaught C++ exception?)\n");
+        std::fflush (stdout);
+        std::_Exit (97);
+    });
+
+    try
+    {
     juce::ScopedJuceInitialiser_GUI init;
 
     PrismProcessor processor;
@@ -507,10 +538,13 @@ int main()
     //   Q=0.08      —— 欠阻尼，峰收回中心频率
     //--------------------------------------------------------------------------
     {
-        auto renderView = [] (float qValue, const juce::String& fileName, const char* label)
+        auto renderView = [] (float qValue, float axisMaxMs, const juce::String& fileName, const char* label)
         {
+
             PrismProcessor fx;
+
             fx.prepareToPlay (48000.0, 512);
+            fx.axisMaxMs.store (axisMaxMs);
 
             auto setParam = [&fx] (const char* id, float value)
             {
@@ -528,12 +562,11 @@ int main()
             double phase = 0.0;
 
             FrequencyViewComponent view (fx);
-            std::printf ("[freqview] constructed\n");
             view.setSize (920, 560);
-            std::printf ("[freqview] sized\n");
 
             for (int block = 0; block < 90; ++block)
             {
+
                 for (int i = 0; i < buffer.getNumSamples(); ++i)
                 {
                     phase += juce::MathConstants<double>::twoPi * 110.0 / 48000.0;
@@ -548,8 +581,11 @@ int main()
 
                 fx.processBlock (buffer, midi);
 
+                
+
                 if (auto* mm = juce::MessageManager::getInstance())
                     mm->runDispatchLoopUntil (12);
+                
             }
 
             const auto snap = view.createComponentSnapshot (view.getLocalBounds(), true, 1.0f);
@@ -565,9 +601,21 @@ int main()
             }
         };
 
-        renderView (0.08f, "ui-frequency-view.png", "Q=0.08");
-        renderView (0.50f, "ui-frequency-view-damped.png", "Q=0.50");
+        renderView (0.08f, 15.0f, "ui-frequency-view-locked.png", "Q=0.08 lock 15ms");
+        renderView (0.08f, 0.0f,  "ui-frequency-view.png", "Q=0.08");
+        renderView (0.50f, 0.0f,  "ui-frequency-view-damped.png", "Q=0.50");
     }
 
     return 0;
+    }
+    catch (const std::exception& e)
+    {
+        std::printf ("\n!! exception: %s\n", e.what());
+        return 98;
+    }
+    catch (...)
+    {
+        std::printf ("\n!! unknown exception\n");
+        return 99;
+    }
 }

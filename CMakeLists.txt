@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Prism VERSION 1.1.2 LANGUAGES C CXX)
+project(Prism VERSION 1.1.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -110,6 +110,11 @@ target_compile_options(PrismEditorProbe PRIVATE /utf-8)
 target_compile_definitions(PrismEditorProbe PRIVATE JUCE_MODAL_LOOPS_PERMITTED=1)
 
 target_include_directories(PrismEditorProbe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Source)
+
+# 生成 .map：崩溃地址 → 函数名（配合源文件里的异常过滤器）
+if(MSVC)
+    target_link_options(PrismEditorProbe PRIVATE /MAP)
+endif()
 
 target_link_libraries(PrismEditorProbe PRIVATE
     juce::juce_audio_utils

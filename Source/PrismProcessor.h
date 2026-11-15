@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "DispersionEngine.h"
@@ -68,6 +68,10 @@ public:
 
     // 给 GUI 用：输出电平（0..1，已做快起慢落），驱动背景的光强度
     std::atomic<float> meterLevel { 0.0f };
+
+    // 给 GUI 用：频率视图的延迟轴上限（毫秒），0 = 自动跟着峰值走。
+    // 不是参数、不进状态 —— 只是窗口的观察习惯，插件实例活着就记着。
+    std::atomic<float> axisMaxMs { 0.0f };
 
     //--------------------------------------------------------------------------
     // 频谱可视化用：输出信号的单声道混合，写进环形缓冲，界面线程来取

@@ -156,12 +156,15 @@ public:
 
             const float peakHz = curve.hz[peakIndex];
 
-            const auto peakText = juce::String::fromUTF8 ("峰值 ")
-                                    + formatHz (peakHz) + juce::String::fromUTF8 (" · ") + formatMs (curve.peakMs);
+            const bool clipped = curve.peakMs > owner.getDisplayPeakMs() * 1.005f;
 
-            g.setColour (accentColour.withAlpha (0.85f * vis));
+            const auto peakText = juce::String::fromUTF8 ("峰值 ")
+                                    + formatHz (peakHz) + juce::String::fromUTF8 (" · ") + formatMs (curve.peakMs)
+                                    + (clipped ? juce::String::fromUTF8 ("  ↑ 超出轴") : juce::String());
+
+            g.setColour ((clipped ? juce::Colour (0xFFE8896B) : accentColour).withAlpha (0.9f * vis));
             g.setFont (prismFont (12.0f));
-            g.drawText (peakText, (int) (w - 230.0f), 6, 224, 16, juce::Justification::centredRight);
+            g.drawText (peakText, (int) (w - 290.0f), 6, 284, 16, juce::Justification::centredRight);
 
             // 过阻尼提示：峰明显低于中心频率时，直接说明原因和怎么调回来
             if (on && peakHz < owner.getCentreHz() * 0.5f)
@@ -309,6 +312,21 @@ FrequencyViewComponent::FrequencyViewComponent (PrismProcessor& processorToUse)
     };
     addAndMakeVisible (pinButton);
 
+    //--------------------------------------------------------------------------
+    // 延迟轴：开 = 锁住当前上限，便于 A/B 对比；关 = 回到自动缩放
+    //--------------------------------------------------------------------------
+    axisLockButton.setButtonText (juce::String::fromUTF8 ("固定轴"));
+    axisLockButton.setComponentID ("prismFreqViewAxisLock");
+    axisLockButton.setClickingTogglesState (true);
+    axisLockButton.setToggleState (processor.axisMaxMs.load() > 0.0f, juce::dontSendNotification);
+    axisLockButton.setColour (juce::TextButton::buttonColourId,   juce::Colour (0xFF1C2028));
+    axisLockButton.setColour (juce::TextButton::buttonOnColourId, juce::Colour (0x33D8A657));
+    axisLockButton.setColour (juce::TextButton::textColourOffId,  juce::Colour (0xFF8A8B96));
+    axisLockButton.setColour (juce::TextButton::textColourOnId,   juce::Colour (0xFFE8C07A));
+    axisLockButton.setTooltip (juce::String::fromUTF8 ("开启：把延迟轴上限锁在当前值，不同 Q / 强度下的曲线高度可以直接对比；关闭：恢复自动缩放"));
+    axisLockButton.onClick = [this] { toggleAxisLock(); };
+    addAndMakeVisible (axisLockButton);
+
     curveLayer = std::make_unique<CurveLayer> (*this);
     addAndMakeVisible (*curveLayer);
 
@@ -322,8 +340,32 @@ FrequencyViewComponent::FrequencyViewComponent (PrismProcessor& processorToUse)
 FrequencyViewComponent::~FrequencyViewComponent() = default;
 
 //==============================================================================
+void FrequencyViewComponent::toggleAxisLock()
+{
+    if (axisLockButton.getToggleState())
+    {
+        // 锁在"当前屏幕上看到的上限"，打开这一刻画面不跳
+        processor.axisMaxMs.store (getDisplayPeakMs());
+    }
+    else
+    {
+        processor.axisMaxMs.store (0.0f);
+    }
+
+    if (curveLayer != nullptr)
+        curveLayer->repaint();
+
+    repaint();
+}
+
+//==============================================================================
 float FrequencyViewComponent::getDisplayPeakMs() const noexcept
 {
+    const float locked = processor.axisMaxMs.load();
+
+    if (locked > 0.0f)
+        return locked;
+
     return juce::jmax (0.05f, smoothedPeakMs);
 }
 
@@ -421,10 +463,15 @@ void FrequencyViewComponent::updateFromParams (bool force)
 //==============================================================================
 void FrequencyViewComponent::timerCallback()
 {
+
+
     updateFromParams (false);
+
 
     // 实时频谱：每帧都要刷
     spectrum.update();
+
+
     spectrum.repaint();
 
     // 纵轴峰值平滑（扫 Q / 扫强度时坐标轴不跳）。差得很小时直接吸附，
@@ -453,11 +500,13 @@ void FrequencyViewComponent::resized()
     curveLayer->setBounds (plot.toNearestInt());
 
     pinButton.setBounds (getWidth() - 24 - 56, 15, 56, 24);
+    axisLockButton.setBounds (pinButton.getX() - 8 - 76, 15, 76, 24);
 }
 
 //==============================================================================
 void FrequencyViewComponent::paint (juce::Graphics& g)
 {
+
     const auto bounds = getLocalBounds().toFloat();
 
     //--------------------------------------------------------------------------
@@ -478,9 +527,9 @@ void FrequencyViewComponent::paint (juce::Graphics& g)
     g.setColour (textColour);
     g.setFont (prismFont (13.5f));
     {
-        // 右侧留给「置顶」按钮
-        const int infoRight = (int) bounds.getWidth() - 24 - 56 - 10;
-        const int infoWidth = juce::jlimit (120, 340, infoRight - 200);
+        // 右侧依次是：信息文字 · 固定轴 · 置顶
+        const int infoRight = axisLockButton.getX() - 10;
+        const int infoWidth = juce::jlimit (100, 340, infoRight - 200);
 
         g.drawText (headerInfo(),
                     juce::Rectangle<int> (infoRight - infoWidth, 16, infoWidth, 22),
