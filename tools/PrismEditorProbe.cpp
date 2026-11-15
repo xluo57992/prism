@@ -1,4 +1,4 @@
-﻿//==============================================================================
+//==============================================================================
 // PrismEditorProbe —— 「打开界面会不会改参数」的回归测试。
 //
 // 模拟宿主的两个动作：
@@ -12,6 +12,7 @@
 
 #include "PrismProcessor.h"
 #include "PrismEditor.h"
+#include "FrequencyView.h"
 
 #include <cstdio>
 #include <vector>
@@ -203,6 +204,85 @@ int main()
     }
 
     std::printf ("=== PASS: 「关于」按钮能弹出面板 ===\n");
+
+    //--------------------------------------------------------------------------
+    // 「频率视图」按钮：必须另开一个顶层窗口，而且开窗不改任何参数
+    //--------------------------------------------------------------------------
+    {
+        float beforeOpen[numParams] {};
+        snapshot (processor, "打开频率视图前", beforeOpen);
+
+        bool windowSeen = false;
+
+        {
+            PrismEditor editor (processor);
+
+            if (auto* mm = juce::MessageManager::getInstance())
+                mm->runDispatchLoopUntil (200);
+
+            auto* button = findByID (editor, "prismFreqViewButton");
+
+            if (button == nullptr)
+            {
+                std::printf ("[FAIL] 找不到「频率视图」按钮\n");
+                return 1;
+            }
+
+            if (auto* b = dynamic_cast<juce::Button*> (button))
+            {
+                b->triggerClick();
+
+                if (auto* mm2 = juce::MessageManager::getInstance())
+                    mm2->runDispatchLoopUntil (300);
+            }
+
+            const juce::String wanted (juce::String::fromUTF8 ("棱镜 · 频率视图"));
+
+            for (int i = 0; i < juce::TopLevelWindow::getNumTopLevelWindows(); ++i)
+            {
+                if (auto* tw = juce::TopLevelWindow::getTopLevelWindow (i))
+                {
+                    if (tw->getName() == wanted)
+                    {
+                        windowSeen = tw->isVisible() && tw->getWidth() > 400 && tw->getHeight() > 300;
+
+                        std::printf ("[freq] 找到窗口 %s  %dx%d 可见=%s\n",
+                                     tw->getName().toRawUTF8(), tw->getWidth(), tw->getHeight(),
+                                     tw->isVisible() ? "是" : "否");
+                    }
+                }
+            }
+
+            // 关掉再切一次：第二次点击应该只是隐藏 / 显示，而不是重建
+            if (auto* b = dynamic_cast<juce::Button*> (button))
+            {
+                b->triggerClick();
+
+                if (auto* mm2 = juce::MessageManager::getInstance())
+                    mm2->runDispatchLoopUntil (150);
+            }
+        }
+
+        if (! windowSeen)
+        {
+            std::printf ("=== FAIL: 点「频率视图」没有开出可用的窗口 ===\n");
+            return 1;
+        }
+
+        float afterClose[numParams] {};
+        snapshot (processor, "关掉频率视图后", afterClose);
+
+        for (int i = 0; i < numParams; ++i)
+        {
+            if (std::abs (beforeOpen[i] - afterClose[i]) > 1.0e-4f)
+            {
+                std::printf ("[FAIL] 开关频率视图改动了 %s: %.4f -> %.4f\n", ids[i], beforeOpen[i], afterClose[i]);
+                return 1;
+            }
+        }
+
+        std::printf ("=== PASS: 「频率视图」能另开窗口，且不影响参数 ===\n");
+    }
 
     //--------------------------------------------------------------------------
     // 旁通：关掉「效果」后，输出必须与输入逐样本一致
@@ -419,6 +499,72 @@ int main()
             png.writeImageToStream (snap, *stream);
             std::printf ("[visual] %5d Hz -> %s\n", (int) freqHz, outFile.getFullPathName().toRawUTF8());
         }
+    }
+
+    //--------------------------------------------------------------------------
+    // 渲染频率视图（docs 用图）：
+    //   默认 Q=0.50 —— 过阻尼，延迟堆在低频端
+    //   Q=0.08      —— 欠阻尼，峰收回中心频率
+    //--------------------------------------------------------------------------
+    {
+        auto renderView = [] (float qValue, const juce::String& fileName, const char* label)
+        {
+            PrismProcessor fx;
+            fx.prepareToPlay (48000.0, 512);
+
+            auto setParam = [&fx] (const char* id, float value)
+            {
+                if (auto* prm = fx.parameters.getParameter (id))
+                    prm->setValueNotifyingHost (prm->convertTo0to1 (value));
+            };
+
+            setParam (PrismProcessor::pFrequency, 1000.0f);
+            setParam (PrismProcessor::pQ,         qValue);
+            setParam (PrismProcessor::pIntensity, 0.66f);
+
+            juce::AudioBuffer<float> buffer (2, 512);
+            juce::MidiBuffer midi;
+            juce::Random rng (3);
+            double phase = 0.0;
+
+            FrequencyViewComponent view (fx);
+            view.setSize (920, 560);
+
+            for (int block = 0; block < 90; ++block)
+            {
+                for (int i = 0; i < buffer.getNumSamples(); ++i)
+                {
+                    phase += juce::MathConstants<double>::twoPi * 110.0 / 48000.0;
+
+                    const float v = 0.30f * (float) std::sin (phase)
+                                  + 0.16f * (float) std::sin (phase * 9.0)
+                                  + 0.10f * (rng.nextFloat() * 2.0f - 1.0f);
+
+                    buffer.setSample (0, i, v);
+                    buffer.setSample (1, i, v);
+                }
+
+                fx.processBlock (buffer, midi);
+
+                if (auto* mm = juce::MessageManager::getInstance())
+                    mm->runDispatchLoopUntil (12);
+            }
+
+            const auto snap = view.createComponentSnapshot (view.getLocalBounds(), true, 1.0f);
+
+            juce::File outFile (fileName);
+            outFile.deleteFile();
+
+            if (auto stream = std::unique_ptr<juce::FileOutputStream> (outFile.createOutputStream()))
+            {
+                juce::PNGImageFormat png;
+                png.writeImageToStream (snap, *stream);
+                std::printf ("[visual] 频率视图（%s）-> %s\n", label, outFile.getFullPathName().toRawUTF8());
+            }
+        };
+
+        renderView (0.08f, "ui-frequency-view.png", "Q=0.08");
+        renderView (0.50f, "ui-frequency-view-damped.png", "Q=0.50");
     }
 
     return 0;

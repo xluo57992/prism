@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "PrismProcessor.h"
 #include "PrismLookAndFeel.h"
 #include "AboutOverlay.h"
+#include "FrequencyView.h"
 #include <array>
 
 //==============================================================================
@@ -41,6 +42,7 @@ private:
     };
 
     void timerCallback() override;
+    void toggleFrequencyView();
 
     struct Knob
     {
@@ -76,7 +78,11 @@ private:
 
     juce::TextButton aboutButton;
     juce::TextButton visualButton;      // 效果总开关（绑定 bypass 参数，可被宿主自动化）
+    juce::TextButton freqButton;        // 打开独立的「频率视图」窗口
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> effectAttachment;
+
+    // 频率视图是独立顶层窗口：编辑器销毁时一起销毁，✕ 只是隐藏
+    std::unique_ptr<FrequencyViewWindow> frequencyWindow;
 
     // 光效开/关的过渡量（0 = 收起，1 = 完全展开），带非线性缓动
     float visualAmount = 1.0f;

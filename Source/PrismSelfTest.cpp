@@ -1,15 +1,17 @@
-﻿//==============================================================================
+//==============================================================================
 // Prism DSP 自检（色散版）
 //
 // 全通滤波器理论上不改幅度谱，所以核心判据就一条：
 //   湿信号 RMS ≈ 干信号 RMS（误差 < 2%），且任何极端参数下都不出 NaN、不发散。
 //==============================================================================
 #include "DispersionEngine.h"
+#include "DispersionCurve.h"
 
 #include <juce_dsp/juce_dsp.h>
 
 #include <cstdio>
 #include <cmath>
+#include <complex>
 #include <vector>
 
 namespace
@@ -357,6 +359,106 @@ int main()
 
             std::printf ("干湿混合 mix=%.1f      最深凹陷 = %.1f dB\n", mixValue, worst);
         }
+    }
+
+    //--------------------------------------------------------------------------
+    // 10. 群延迟（频率视图用的那套数学）
+    //     独立算法核对：直接对 H(ω) 的相位做中央差分，不应依赖同一份公式
+    //--------------------------------------------------------------------------
+    {
+        auto measuredDelay = [] (double f, double sr_, double f0, double q)
+        {
+            const auto c = dispersion::makeStageCoefficients (f0, q, sr_);
+
+            auto h = [&] (double hz)
+            {
+                const double w = juce::MathConstants<double>::twoPi * hz / sr_;
+                const std::complex<double> u (std::cos (w), -std::sin (w));
+                return (c.a2 + c.a1 * u + u * u) / (1.0 + c.a1 * u + c.a2 * u * u);
+            };
+
+            const double d = juce::jmax (1.0e-4, f * 1.0e-5);
+            const double dphi = std::arg (h (f + d) * std::conj (h (f - d)));   // 相位差主值
+            return -dphi / (2.0 * d) / juce::MathConstants<double>::twoPi;
+        };
+
+        double worst = 0.0;
+        bool allPositive = true;
+
+        for (double f0 : { 100.0, 1000.0, 8000.0 })
+        {
+            for (double q : { 0.05, 0.5, 1.0 })
+            {
+                for (double f : { 20.0, 100.0, 500.0, 1000.0, 5000.0, 15000.0 })
+                {
+                    const double formula = dispersion::stageGroupDelaySeconds (f, sr, f0, q);
+                    const double numeric = measuredDelay (f, sr, f0, q);
+
+                    if (! (formula > 0.0))
+                        allPositive = false;
+
+                    worst = juce::jmax (worst, std::abs (formula - numeric) / juce::jmax (numeric, 1.0e-12));
+                }
+            }
+        }
+
+        std::printf ("群延迟 vs 相位差分        最大相对误差 = %.3e\n", worst);
+
+        check (worst < 2.0e-3, "群延迟公式与相位差分一致（相对误差 < 0.2%）");
+        check (allPositive, "群延迟处处为正（无源全通不会提前）");
+
+        //--------------------------------------------------------------------------
+        // 峰值位置随 Q（阻尼）变化，这是全通自身的物理行为：
+        //   Q 小 → 欠阻尼，极点是一对共轭复数，峰落在中心频率
+        //   Q 大 → 过阻尼，极点分裂成两个实数，整条链退化成"低频相位旋转"，峰在 DC 端
+        //--------------------------------------------------------------------------
+        const double resCentre = dispersion::stageGroupDelaySeconds (1000.0, sr, 1000.0, 0.05);
+        const double resBelow  = dispersion::stageGroupDelaySeconds (667.0,  sr, 1000.0, 0.05);
+        const double resAbove  = dispersion::stageGroupDelaySeconds (1500.0, sr, 1000.0, 0.05);
+
+        std::printf ("Q=0.05 中心 1 kHz = %.3f ms（0.67k: %.3f，1.5k: %.3f）\n",
+                     resCentre * 1e3, resBelow * 1e3, resAbove * 1e3);
+
+        check (resCentre > resBelow * 1.5 && resCentre > resAbove * 1.5,
+               "Q=0.05（欠阻尼）时群延迟峰在中心频率，两侧快速回落");
+
+        const double dampedLow = dispersion::stageGroupDelaySeconds (20.0,   sr, 1000.0, 0.75);
+        const double dampedMid = dispersion::stageGroupDelaySeconds (1000.0, sr, 1000.0, 0.75);
+
+        std::printf ("Q=0.75 20 Hz = %.3f ms，1 kHz = %.3f ms（过阻尼，延迟堆在低频端）\n",
+                     dampedLow * 1e3, dampedMid * 1e3);
+
+        check (dampedLow > dampedMid * 3.0,
+               "Q=0.75（过阻尼）时延迟堆到低频端（物理行为，不是 bug）");
+    }
+
+    //--------------------------------------------------------------------------
+    // 11. 频率视图的曲线数据：欠阻尼时受影响频段要包含中心频率
+    //--------------------------------------------------------------------------
+    {
+        const auto curve = dispersion::computeCurve (sr, 1000.0, 0.10, 40, 720);
+
+        std::printf ("曲线：峰值 %.2f ms，受影响频段 %.0f–%.0f Hz（%d 级，Q=0.10）\n",
+                     curve.peakMs, curve.bandLowHz, curve.bandHighHz, curve.stages);
+
+        check (curve.stages == 40, "曲线记录的级数正确");
+        check (curve.peakMs > 1.0f, "40 级在中心频率附近有可观的群延迟");
+        check (curve.bandValid, "受影响频段有效");
+        check (curve.bandLowHz < 1000.0f && curve.bandHighHz > 1000.0f,
+               "欠阻尼时受影响频段包含中心频率");
+
+        const auto damped = dispersion::computeCurve (sr, 1000.0, 0.50, 40, 720);
+
+        std::printf ("曲线（Q=0.50）：峰值 %.2f ms，受影响频段 %.0f–%.0f Hz\n",
+                     damped.peakMs, damped.bandLowHz, damped.bandHighHz);
+
+        check (damped.bandValid && damped.bandLowHz <= 21.0f,
+               "过阻尼时受影响频段从最低频开始（延迟堆在低频端）");
+
+        const auto empty = dispersion::computeCurve (sr, 1000.0, 0.50, 0, 720);
+
+        check (empty.stages == 0 && empty.peakMs == 0.0f && ! empty.bandValid,
+               "0 级时曲线全零、没有受影响频段");
     }
 
     //--------------------------------------------------------------------------

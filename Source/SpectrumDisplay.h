@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <juce_dsp/juce_dsp.h>
@@ -20,6 +20,9 @@ public:
     void paint (juce::Graphics&) override;
     void update();          // 由编辑器的定时器调用
 
+    // 频率视图里当背景层用：不画圆角底、刻度、等待提示，只留曲线本身
+    void setMinimalStyle (bool shouldUseMinimalStyle);
+
 private:
     static constexpr int fftOrder = 11;
     static constexpr int fftSize  = 1 << fftOrder;      // 2048
@@ -33,6 +36,8 @@ private:
     std::array<float, fftSize * 2> fftData {};
     std::array<float, numBins> binLevel {};   // 0..1，已做时间平滑
     std::array<float, numBins> binPeak {};
+
+    bool minimal = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SpectrumDisplay)
 };

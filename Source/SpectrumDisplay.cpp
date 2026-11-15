@@ -1,4 +1,4 @@
-﻿#include "SpectrumDisplay.h"
+#include "SpectrumDisplay.h"
 #include "PrismProcessor.h"
 #include <cmath>
 #include <algorithm>
@@ -101,24 +101,37 @@ void SpectrumDisplay::update()
 }
 
 //==============================================================================
+void SpectrumDisplay::setMinimalStyle (bool shouldUseMinimalStyle)
+{
+    if (minimal == shouldUseMinimalStyle)
+        return;
+
+    minimal = shouldUseMinimalStyle;
+    repaint();
+}
+
+//==============================================================================
 void SpectrumDisplay::paint (juce::Graphics& g)
 {
     auto bounds = getLocalBounds().toFloat();
 
-    g.setColour (juce::Colour (0x55000000));
-    g.fillRoundedRectangle (bounds, 6.0f);
+    if (! minimal)
+    {
+        g.setColour (juce::Colour (0x55000000));
+        g.fillRoundedRectangle (bounds, 6.0f);
 
-    g.setColour (juce::Colour (0x22FFFFFF));
-    g.drawRoundedRectangle (bounds.reduced (0.5f), 6.0f, 1.0f);
+        g.setColour (juce::Colour (0x22FFFFFF));
+        g.drawRoundedRectangle (bounds.reduced (0.5f), 6.0f, 1.0f);
+    }
 
-    auto plot = bounds.reduced (8.0f, 10.0f);
+    auto plot = minimal ? bounds : bounds.reduced (8.0f, 10.0f);
 
     if (plot.getHeight() <= 4.0f || plot.getWidth() <= 4.0f)
         return;
 
     const float maxLevel = *std::max_element (binLevel.begin(), binLevel.end());
 
-    if (maxLevel < 0.015f)
+    if (maxLevel < 0.015f && ! minimal)
     {
         g.setColour (juce::Colour (0x66FFFFFF));
         g.setFont (juce::Font (juce::FontOptions ("Microsoft YaHei UI", 12.0f, juce::Font::plain)));
@@ -126,21 +139,24 @@ void SpectrumDisplay::paint (juce::Graphics& g)
     }
 
     //--------------------------------------------------------------------------
-    // 频率刻度线
+    // 频率刻度线（频率视图自己画轴，这里只给「关于」面板用）
     //--------------------------------------------------------------------------
-    g.setFont (juce::Font (juce::FontOptions (9.5f)));
-
-    for (double f : { 100.0, 1000.0, 10000.0 })
+    if (! minimal)
     {
-        const float x = plot.getX() + logPosition (f) * plot.getWidth();
+        g.setFont (juce::Font (juce::FontOptions (9.5f)));
 
-        g.setColour (juce::Colour (0x1AFFFFFF));
-        g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+        for (double f : { 100.0, 1000.0, 10000.0 })
+        {
+            const float x = plot.getX() + logPosition (f) * plot.getWidth();
 
-        g.setColour (juce::Colour (0x66FFFFFF));
-        g.drawText (f >= 1000.0 ? juce::String (f / 1000.0, 0) + "k" : juce::String ((int) f),
-                    juce::Rectangle<float> (x - 12.0f, plot.getBottom() - 10.0f, 24.0f, 10.0f),
-                    juce::Justification::centred);
+            g.setColour (juce::Colour (0x1AFFFFFF));
+            g.drawVerticalLine ((int) x, plot.getY(), plot.getBottom());
+
+            g.setColour (juce::Colour (0x66FFFFFF));
+            g.drawText (f >= 1000.0 ? juce::String (f / 1000.0, 0) + "k" : juce::String ((int) f),
+                        juce::Rectangle<float> (x - 12.0f, plot.getBottom() - 10.0f, 24.0f, 10.0f),
+                        juce::Justification::centred);
+        }
     }
 
     //--------------------------------------------------------------------------

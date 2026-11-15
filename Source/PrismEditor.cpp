@@ -1,4 +1,4 @@
-﻿#include "PrismEditor.h"
+#include "PrismEditor.h"
 #include "PrismLog.h"
 #include <cmath>
 
@@ -143,6 +143,16 @@ PrismEditor::PrismEditor (PrismProcessor& processorToUse)
                            (processor.parameters, PrismProcessor::pEffect, visualButton);
 
     //--------------------------------------------------------------------------
+    // 频率视图（右上角）：另开一个窗口，看群延迟分布
+    //--------------------------------------------------------------------------
+    freqButton.setButtonText (juce::String::fromUTF8 ("频率视图"));
+    freqButton.setComponentID ("prismFreqViewButton");
+    freqButton.setLookAndFeel (&lookAndFeel);
+    freqButton.setTooltip (juce::String::fromUTF8 ("另开一个窗口：看哪些频率被拖慢、拖慢了多少毫秒"));
+    freqButton.onClick = [this] { toggleFrequencyView(); };
+    canvas.addAndMakeVisible (freqButton);
+
+    //--------------------------------------------------------------------------
     // 关于面板最后添加，保证盖在其它控件上面
     //--------------------------------------------------------------------------
     aboutOverlay = std::make_unique<AboutOverlay> (processor);
@@ -154,6 +164,10 @@ PrismEditor::PrismEditor (PrismProcessor& processorToUse)
     if (juce::SystemStats::getEnvironmentVariable ("PRISM_BYPASS", "0") == "1")
         if (auto* prm = processor.parameters.getParameter (PrismProcessor::pEffect))
             prm->setValueNotifyingHost (0.0f);
+
+    // 调试用：PRISM_FREQVIEW=1 启动即打开频率视图（截图用）
+    if (juce::SystemStats::getEnvironmentVariable ("PRISM_FREQVIEW", "0") == "1")
+        toggleFrequencyView();
 
     refreshValues();
 
@@ -174,7 +188,36 @@ PrismEditor::~PrismEditor()
     PrismLog ("--- editor dtor ---");
 
     stopTimer();
+
+    // 频率视图是独立顶层窗口，必须比编辑器先死（它持有 processor 引用）
+    frequencyWindow.reset();
+
     setLookAndFeel (nullptr);
+}
+
+//==============================================================================
+void PrismEditor::toggleFrequencyView()
+{
+    // 第一次点：建窗口并显示；之后再点就是显示/隐藏的切换
+    if (frequencyWindow == nullptr)
+    {
+        frequencyWindow = std::make_unique<FrequencyViewWindow> (processor);
+        frequencyWindow->toFront (true);
+
+        PrismLog ("--- frequency view opened ---");
+        return;
+    }
+
+    const bool show = ! frequencyWindow->isVisible();
+    frequencyWindow->setVisible (show);
+
+    if (show)
+    {
+        frequencyWindow->toFront (true);
+        frequencyWindow->view().repaint();
+    }
+
+    PrismLog ("--- frequency view visible=" + juce::String ((int) show) + " ---");
 }
 
 //==============================================================================
@@ -281,9 +324,13 @@ void PrismEditor::resized()
     mixValueLabel.setBounds (mixKnobX - 40, mixKnobY + mixKnobSize + 8, mixKnobSize + 80, 34);
     mixStateLabel.setBounds (24, 74, 320, 24);
 
-    // 顶栏
-    aboutButton.setBounds (winW - 16 - 62, 16, 62, 28);
-    visualButton.setBounds (winW - 16 - 62 - 8 - 62, 16, 62, 28);
+    // 顶栏：三个按钮，右对齐（频率视图 / 总开关 / 关于）
+    constexpr int topButtonW = 76;
+    constexpr int topButtonGap = 8;
+
+    aboutButton.setBounds  (winW - 16 - topButtonW, 16, topButtonW, 28);
+    visualButton.setBounds (winW - 16 - topButtonW * 2 - topButtonGap, 16, topButtonW, 28);
+    freqButton.setBounds   (winW - 16 - topButtonW * 3 - topButtonGap * 2, 16, topButtonW, 28);
 
     // 底部 4 个参数旋钮：一行居中
     const int count = (int) drawerKnobs.size();

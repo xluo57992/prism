@@ -1,6 +1,6 @@
-﻿cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.22)
 
-project(Prism VERSION 1.0.0 LANGUAGES C CXX)
+project(Prism VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,7 +53,9 @@ target_sources(Prism PRIVATE
     Source/PrismProcessor.cpp
     Source/PrismEditor.cpp
     Source/DispersionEngine.cpp
+    Source/DispersionCurve.cpp
     Source/SpectrumDisplay.cpp
+    Source/FrequencyView.cpp
     Source/AboutOverlay.cpp)
 
 target_compile_definitions(Prism PUBLIC
@@ -83,7 +85,8 @@ target_link_libraries(Prism
 #------------------------------------------------------------------------------
 add_executable(PrismSelfTest
     Source/PrismSelfTest.cpp
-    Source/DispersionEngine.cpp)
+    Source/DispersionEngine.cpp
+    Source/DispersionCurve.cpp)
 
 target_compile_options(PrismSelfTest PRIVATE /utf-8)
 target_link_libraries(PrismSelfTest PRIVATE juce::juce_audio_basics juce::juce_dsp)
@@ -96,7 +99,9 @@ add_executable(PrismEditorProbe
     Source/PrismProcessor.cpp
     Source/PrismEditor.cpp
     Source/DispersionEngine.cpp
+    Source/DispersionCurve.cpp
     Source/SpectrumDisplay.cpp
+    Source/FrequencyView.cpp
     Source/AboutOverlay.cpp)
 
 target_compile_options(PrismEditorProbe PRIVATE /utf-8)
