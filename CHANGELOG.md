@@ -9,6 +9,8 @@
   现在写成 `Fx|Filter`（全通滤波器，DSP 上是滤波类），宿主的分类 / 插件信息里能认到「Filter」。
   - 注意：宿主会缓存插件信息。FL Studio 打开插件窗口 → 齿轮（Wrapper settings）→ 点
     「Refresh plugin properties」；REAPER 里「重新扫描」插件目录即可看到新版本。
+- 修复：「关于」面板里的版本号是写死的 `v1.1.3`，升版本后会显示旧号。现在从 CMake 注入的
+  `JucePlugin_VersionString` 取，以后升版本不用再手改。
 
 
 ## v1.1.3 — 2026-11-15
