@@ -3,6 +3,14 @@
 仓库保留完整提交历史，每个版本都打了 tag、并在 GitHub Releases 里放了对应的 VST3 包。
 这一页只是把「改了什么、为什么改」按版本整理成能直接读的记录。
 
+## v1.1.4 — 2026-11-16
+
+- 修复：VST3 分类只有 `Fx`，宿主（FL Studio / Bitwig）的插件信息里 Category 没有子类型。
+  现在写成 `Fx|Filter`（全通滤波器，DSP 上是滤波类），宿主的分类 / 插件信息里能认到「Filter」。
+  - 注意：宿主会缓存插件信息。FL Studio 打开插件窗口 → 齿轮（Wrapper settings）→ 点
+    「Refresh plugin properties」；REAPER 里「重新扫描」插件目录即可看到新版本。
+
+
 ## v1.1.3 — 2026-11-15
 
 - 频率视图新增「固定轴」开关：开启后把延迟轴上限锁在按下那一刻的数值，不同 Q / 强度下的

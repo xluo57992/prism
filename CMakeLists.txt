@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Prism VERSION 1.1.3 LANGUAGES C CXX)
+project(Prism VERSION 1.1.4 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -47,7 +47,7 @@ juce_add_plugin(Prism
     IS_MIDI_EFFECT           FALSE
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD  FALSE
-    VST3_CATEGORIES          "Fx")
+    VST3_CATEGORIES          Fx Filter)
 
 target_sources(Prism PRIVATE
     Source/PrismProcessor.cpp
